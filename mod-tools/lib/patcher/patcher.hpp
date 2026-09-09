@@ -5,7 +5,7 @@
 #include <fs.hpp>
 
 namespace lol::patcher {
-    /// Writes one diagnostic line to stderr, which Zushi captures and echoes.
+    /// Writes one diagnostic line to stderr, which Nebula captures and echoes.
     void patch_log(char const* fmt, ...) noexcept __attribute__((format(printf, 1, 2)));
 
     /// Resumes a game frozen by Process::Suspend(). Call from a termination

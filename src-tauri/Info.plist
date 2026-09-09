@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>CFBundleIdentifier</key>
-    <string>com.zushi.app</string>
+    <string>com.nebula.app</string>
     <key>CFBundleName</key>
-    <string>Zushi</string>
+    <string>Nebula</string>
     <key>CFBundleDisplayName</key>
-    <string>Zushi</string>
+    <string>Nebula</string>
     <key>CFBundleVersion</key>
     <string>0.1.2</string>
     <key>CFBundleShortVersionString</key>
@@ -15,7 +15,7 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
-    <string>zushi</string>
+    <string>nebula</string>
     <key>LSMinimumSystemVersion</key>
     <string>10.15</string>
 </dict>

@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 
-const GITHUB_REPO = "Mouadzz/zushi";
-const RELEASES_URL = `https://github.com/${GITHUB_REPO}/releases`;
-const API_URL = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+// No public releases repo for Nebula yet. Point this at your own repo
+// (owner/name) once you publish releases there.
+const GITHUB_REPO = "";
+const RELEASES_URL = GITHUB_REPO ? `https://github.com/${GITHUB_REPO}/releases` : "";
+const API_URL = GITHUB_REPO ? `https://api.github.com/repos/${GITHUB_REPO}/releases/latest` : "";
 
 function compareVersions(current: string, latest: string): number {
   const a = current.split(".").map(Number);
@@ -20,6 +22,7 @@ export function useVersionCheck() {
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!GITHUB_REPO) return;
     (async () => {
       try {
         const currentVersion = await getVersion();

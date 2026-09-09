@@ -42,7 +42,7 @@ function App() {
   const [selectedChampion, setSelectedChampion] = useState<Champion | null>(null);
   const [skinSelection, setSkinSelection] = useState<Record<string, string>>(() => {
     try {
-      const raw = localStorage.getItem("zushi_skin_selection");
+      const raw = localStorage.getItem("nebula_skin_selection");
       if (raw) return JSON.parse(raw) as Record<string, string>;
     } catch {}
     return {};
@@ -102,7 +102,7 @@ function App() {
   }, [skinSelection, dl.downloads, customs.enabledPaths, patcher]);
 
   useEffect(() => {
-    localStorage.setItem("zushi_skin_selection", JSON.stringify(skinSelection));
+    localStorage.setItem("nebula_skin_selection", JSON.stringify(skinSelection));
   }, [skinSelection]);
 
   const skinCount = Object.keys(skinSelection).length;
@@ -169,8 +169,8 @@ function App() {
     <div className="bg-charcoal-400 relative flex h-screen">
       <aside className="border-border flex w-50 shrink-0 flex-col border-r">
         <div className="flex items-end gap-2.5 px-4 py-4 select-none">
-          <img src={logo} alt="Zushi" className="h-9 w-9" />
-          <span className="font-logo text-gold-400 text-4xl leading-6 uppercase">Zushi</span>
+          <img src={logo} alt="Nebula" className="h-9 w-9" />
+          <span className="font-logo text-gold-400 text-4xl leading-6 uppercase">Nebula</span>
         </div>
 
         <div className="border-border mx-3 border-b" />
@@ -209,7 +209,7 @@ function App() {
               fill="currentColor"
               className="text-gold-400 shrink-0"
             />
-            <span className="whitespace-nowrap">Star Zushi on GitHub</span>
+            <span className="whitespace-nowrap">Star the original on GitHub</span>
           </button>
 
           {update.updateAvailable && update.latestVersion ? (

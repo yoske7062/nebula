@@ -306,7 +306,7 @@ fn do_apply_skins_bg(
         if let Some(out) = stdout {
             let reader = BufReader::new(out);
             for line in reader.lines().map_while(Result::ok) {
-                eprintln!("[zushi] mod-tools: {}", line);
+                eprintln!("[nebula] mod-tools: {}", line);
                 if let Some(status_msg) = line.strip_prefix("Status: ") {
                     let new_status = match status_msg {
                         "Waiting for league match to start" => Some(PatcherStatus::WaitingForGame),
@@ -333,7 +333,7 @@ fn do_apply_skins_bg(
         if let Some(err) = stderr {
             let reader = BufReader::new(err);
             for line in reader.lines().map_while(Result::ok) {
-                eprintln!("[zushi] mod-tools err: {}", line);
+                eprintln!("[nebula] mod-tools err: {}", line);
             }
         }
     });
@@ -360,7 +360,7 @@ fn do_apply_skins_bg(
                 } else {
                     "unknown".to_string()
                 };
-                eprintln!("[zushi] mod-tools runoverlay exited: {}", detail);
+                eprintln!("[nebula] mod-tools runoverlay exited: {}", detail);
                 s.patcher_status =
                     PatcherStatus::Error(format!("Patcher exited unexpectedly ({})", detail));
             } else {

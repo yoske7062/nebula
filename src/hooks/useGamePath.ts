@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { detectGamePath, setGamePath, validateGamePath } from "../lib/commands";
 import type { AppStatus } from "../types";
 
-const SETUP_KEY = "zushi:setup_complete";
+const SETUP_KEY = "nebula:setup_complete";
 
 export function useGamePath() {
   const [gamePath, setGamePathState] = useState<string | null>(null);
