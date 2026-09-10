@@ -306,7 +306,7 @@ export default function MySkins({
 
                             {baseSelected && (
                               <div className="bg-gold-400 absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/30 shadow-sm">
-                                <Check size={11} strokeWidth={3} className="text-charcoal-600" />
+                                <Check size={11} strokeWidth={3} className="text-white" />
                               </div>
                             )}
                             {selectedChroma && (

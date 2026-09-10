@@ -1,42 +1,39 @@
 @import "tailwindcss";
 
-@font-face {
-  font-family: "JungleAdventurer";
-  src: url("./assets/fonts/JungleAdventurer.ttf") format("truetype");
-  font-weight: normal;
-  font-style: normal;
-  font-display: swap;
-}
-
 @theme {
-  --color-charcoal-50: #3a3a42;
-  --color-charcoal-100: #2d2d35;
-  --color-charcoal-200: #252530;
-  --color-charcoal-300: #1e1e28;
-  --color-charcoal-400: #181820;
-  --color-charcoal-500: #121218;
-  --color-charcoal-600: #0a0a10;
+  /* Light neutrals (page/card chrome). 600 and the 50 ring stay dark on
+     purpose — they only dress splash-art containers/overlays, which read
+     as a photo mat regardless of the overall light theme. */
+  --color-charcoal-50: #33403d;
+  --color-charcoal-100: #e2e8e6;
+  --color-charcoal-200: #eaf4f2;
+  --color-charcoal-300: #dbe6e4;
+  --color-charcoal-400: #f5f8f7;
+  --color-charcoal-500: #ffffff;
+  --color-charcoal-600: #10201d;
 
-  --color-gold-100: #fdf0c4;
-  --color-gold-200: #f5d77a;
-  --color-gold-300: #e8c44a;
-  --color-gold-400: #c89b3c;
-  --color-gold-500: #a17a2e;
-  --color-gold-600: #7a5c22;
+  /* Aqua-green accent */
+  --color-gold-100: #ccfbf1;
+  --color-gold-200: #99f6e4;
+  --color-gold-300: #5eead4;
+  --color-gold-400: #14b8a6;
+  --color-gold-500: #0d9488;
+  --color-gold-600: #0f766e;
 
-  --color-ink: #e8e6e3;
-  --color-ink-secondary: #9e9e9e;
-  --color-ink-muted: #6b6b6b;
+  --color-ink: #111827;
+  --color-ink-secondary: #5b6b68;
+  --color-ink-muted: #8a9793;
 
-  --color-border: rgba(255, 255, 255, 0.08);
-  --color-border-accent: #c89b3c;
+  --color-border: #dde7e5;
+  --color-border-accent: #14b8a6;
 
-  --color-success: #2ecc71;
-  --color-error: #e74c3c;
-  --color-warning: #f39c12;
+  --color-success: #22c55e;
+  --color-error: #ef4444;
+  --color-warning: #f59e0b;
 
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
-  --font-logo: "JungleAdventurer", system-ui, sans-serif;
+  --font-sans:
+    "Inter", "SF Pro Rounded", "Nunito", system-ui, -apple-system, sans-serif;
+  --font-logo: var(--font-sans);
 
   --animate-shimmer: shimmer 2.5s ease-in-out infinite;
 }
@@ -62,8 +59,8 @@ body,
   margin: 0;
   padding: 0;
   overflow: hidden;
-  background-color: #181820;
-  color: #e8e6e3;
+  background-color: #f5f8f7;
+  color: #111827;
   font-family:
     "Inter",
     system-ui,
@@ -73,7 +70,7 @@ body,
   user-select: none;
 }
 
-/* Thin scrollbar matching the dark theme */
+/* Thin scrollbar matching the light theme */
 ::-webkit-scrollbar {
   width: 6px;
 }
@@ -83,10 +80,10 @@ body,
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(16, 32, 29, 0.12);
   border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(16, 32, 29, 0.22);
 }

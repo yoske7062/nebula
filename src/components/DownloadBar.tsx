@@ -26,7 +26,7 @@ export default function DownloadBar({ downloading }: DownloadBarProps) {
   const pct = progress ? Math.round((progress.current / progress.total) * 100) : null;
 
   return (
-    <div className="border-border bg-charcoal-600 relative flex items-center gap-3 border-t px-4 py-2">
+    <div className="border-border bg-charcoal-500 relative flex items-center gap-3 border-t px-4 py-2 shadow-[0_-1px_8px_rgba(16,32,29,0.06)]">
       <Loader2 size={14} className="text-gold-400 shrink-0 animate-spin" />
       <span className="text-ink truncate text-sm font-medium">{label}</span>
       {progress && (

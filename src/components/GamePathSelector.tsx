@@ -137,7 +137,7 @@ export default function GamePathSelector({
             <button
               onClick={handleContinue}
               disabled={loading}
-              className="bg-gold-400 text-charcoal-600 hover:bg-gold-300 w-full cursor-pointer rounded-md px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+              className="bg-gold-400 text-white hover:bg-gold-300 w-full cursor-pointer rounded-md px-5 py-2.5 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
