@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
-import { invoke } from "@tauri-apps/api/core";
-import { Swords, Layers, Package, Settings as SettingsIcon, Star } from "lucide-react";
+import { Swords, Layers, Package, Settings as SettingsIcon } from "lucide-react";
 import { useGamePath } from "./hooks/useGamePath";
 import { usePatcher } from "./hooks/usePatcher";
 import { useDownloads } from "./hooks/useDownloads";
@@ -197,21 +196,6 @@ function App() {
         </nav>
 
         <div className="mt-auto">
-          <button
-            onClick={() =>
-              invoke("open_url", { url: "https://github.com/Mouadzz/zushi" }).catch(() => {})
-            }
-            className="text-ink-muted hover:text-gold-400 mx-2 mb-2 flex cursor-pointer items-center gap-1.5 rounded-md px-3 py-2 text-sm transition-colors"
-          >
-            <Star
-              size={16}
-              strokeWidth={1.5}
-              fill="currentColor"
-              className="text-gold-400 shrink-0"
-            />
-            <span className="whitespace-nowrap">Star the original on GitHub</span>
-          </button>
-
           {update.updateAvailable && update.latestVersion ? (
             <UpdateBanner version={update.latestVersion} releasesUrl={update.releasesUrl} />
           ) : (
