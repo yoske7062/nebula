@@ -117,7 +117,7 @@ function SkinCard({
           ) : baseState.available && !busy ? (
             <button
               onClick={() => onDownloadGroup(group)}
-              className="bg-charcoal-600/80 hover:bg-gold-400 hover:text-white flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-white opacity-0 shadow-lg transition-colors group-hover:opacity-100"
+              className="bg-charcoal-600/80 hover:bg-gold-400 hover:text-charcoal-600 flex h-7 w-7 cursor-pointer items-center justify-center rounded-full text-white opacity-0 shadow-lg transition-colors group-hover:opacity-100"
               title={
                 group.chromas.length > 0
                   ? `Download skin and ${group.chromas.length} chroma${group.chromas.length === 1 ? "" : "s"}`
@@ -239,7 +239,7 @@ export default function ChampionDetail({
             <button
               onClick={handleDownloadAll}
               disabled={busy}
-              className="bg-gold-400 text-white hover:bg-gold-300 flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40"
+              className="bg-gold-400 text-charcoal-600 hover:bg-gold-300 flex cursor-pointer items-center gap-1.5 rounded px-3 py-1.5 text-xs font-medium transition-colors disabled:pointer-events-none disabled:opacity-40"
             >
               <Download size={13} strokeWidth={2} />
               Download All

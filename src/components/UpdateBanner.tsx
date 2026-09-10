@@ -13,7 +13,7 @@ export default function UpdateBanner({ version, releasesUrl }: UpdateBannerProps
       </span>
       <button
         onClick={() => invoke("open_url", { url: releasesUrl }).catch(() => {})}
-        className="bg-gold-400 text-white hover:bg-gold-300 w-full cursor-pointer rounded px-3 py-1.5 text-xs font-medium transition-colors"
+        className="bg-gold-400 text-charcoal-600 hover:bg-gold-300 w-full cursor-pointer rounded px-3 py-1.5 text-xs font-medium transition-colors"
       >
         Download update
       </button>

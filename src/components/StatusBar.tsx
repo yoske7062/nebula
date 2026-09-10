@@ -92,7 +92,7 @@ export default function StatusBar({
             className={[
               "flex h-9 items-center gap-2 rounded-xl px-4 transition-all active:scale-95",
               canApply
-                ? "bg-gold-400 text-white hover:bg-gold-300 shadow-gold-400/30 cursor-pointer shadow-lg"
+                ? "bg-gold-400 text-charcoal-600 hover:bg-gold-300 shadow-gold-400/30 cursor-pointer shadow-lg"
                 : "bg-charcoal-300 text-ink-muted/30 pointer-events-none",
             ].join(" ")}
           >
