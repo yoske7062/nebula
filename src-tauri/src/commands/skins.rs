@@ -50,6 +50,41 @@ fn flatten<T>(res: Result<Result<T, String>, impl std::fmt::Display>) -> Result<
     }
 }
 
+pub fn skin_zip_path(app: &AppHandle, champion_name: &str, skin_name: &str) -> PathBuf {
+    skins_dir(app)
+        .join(encode_path(champion_name))
+        .join(encode_path(skin_name))
+        .join(format!("{}.zip", encode_path(skin_name)))
+}
+
+/// Blocking download of one skin zip into the skins folder; returns its path.
+pub fn fetch_skin(
+    app: &AppHandle,
+    url: &str,
+    champion_name: &str,
+    skin_name: &str,
+) -> Result<String, String> {
+    let zip_path = skin_zip_path(app, champion_name, skin_name);
+    fs::create_dir_all(zip_path.parent().ok_or("bad skin path")?).map_err(|e| e.to_string())?;
+
+    let resp = ureq::get(url)
+        .call()
+        .map_err(|e| format!("Download failed: {e}"))?;
+
+    let mut bytes = Vec::new();
+    resp.into_reader()
+        .read_to_end(&mut bytes)
+        .map_err(|e| format!("Read failed: {e}"))?;
+
+    if bytes.is_empty() {
+        return Err("Downloaded file is empty".to_string());
+    }
+
+    fs::write(&zip_path, &bytes).map_err(|e| format!("Write failed: {e}"))?;
+
+    Ok(zip_path.to_string_lossy().into_owned())
+}
+
 /// Download a single skin zip. Runs blocking I/O on a background thread.
 #[tauri::command]
 pub async fn download_skin(
@@ -58,32 +93,9 @@ pub async fn download_skin(
     champion_name: String,
     skin_name: String,
 ) -> Result<String, String> {
-    let base = skins_dir(&app);
     flatten(
         tauri::async_runtime::spawn_blocking(move || {
-            let skin_dir = base
-                .join(encode_path(&champion_name))
-                .join(encode_path(&skin_name));
-            fs::create_dir_all(&skin_dir).map_err(|e| e.to_string())?;
-
-            let zip_path = skin_dir.join(format!("{}.zip", encode_path(&skin_name)));
-
-            let resp = ureq::get(&url)
-                .call()
-                .map_err(|e| format!("Download failed: {e}"))?;
-
-            let mut bytes = Vec::new();
-            resp.into_reader()
-                .read_to_end(&mut bytes)
-                .map_err(|e| format!("Read failed: {e}"))?;
-
-            if bytes.is_empty() {
-                return Err("Downloaded file is empty".to_string());
-            }
-
-            fs::write(&zip_path, &bytes).map_err(|e| format!("Write failed: {e}"))?;
-
-            Ok(zip_path.to_string_lossy().into_owned())
+            fetch_skin(&app, &url, &champion_name, &skin_name)
         })
         .await,
     )

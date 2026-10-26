@@ -37,3 +37,33 @@ commit `9dd1b2e` (v0.1.12) and has ported everything up to v0.1.15 (`8e2b63f`).
 7. If the patch exposes a new break upstream has not fixed, compare the failing scan against the new binary with `otool`/`nm` and adapt the scan in `patcher_macos_arm64.cpp`.
 
 Last ported upstream commit: `8e2b63f` (v0.1.15, 2026-10-22).
+
+## Picking skins inside the League client (Pengu)
+
+Nebula can show its skin picker inside champion select. That uses Pengu Loader, a dylib
+inserted into the client's CEF `libEGL.dylib` that injects JS plugins into the client UI.
+
+Pieces:
+- `~/Desktop/game/Pengu`: Pengu source with our arm64 port (`platform.h`, `hook.h` arm64
+  trampoline with two-step W^X writes, background-colour scan skipped on arm64). Build with
+  `ARCH=arm64 make release` and `ARCH=x86_64 make release`, then `lipo` both into `bin/core.dylib`
+  (needs `plugins/dist/preload.g.h` from `cd plugins && npm i && npx vite build`).
+- `scripts/pengu-install.sh`: copies `core.dylib` and `client-plugin/` to `/Users/Shared/nebula`,
+  patches only the arm64 slice of the client's `libEGL.dylib` (the x86_64 slice has too little
+  header padding), re-signs ad-hoc, refuses to run while League is open. `restore` undoes it.
+  Run it again after every League update: the client replaces `libEGL.dylib`.
+- `client-plugin/index.js`: the panel. It talks to the Nebula daemon on `127.0.0.1:47831` with a
+  token read from `token.js` (created by the install script, read by the daemon).
+- `src-tauri/src/commands/bridge.rs`: the daemon API (`/skins`, `/apply`, `/status`, `/stop`) and the
+  remembered pick per champion. `auto.rs` applies that pick when the champion is locked.
+
+What broke and why:
+- Pengu searches CEF with a *relative* `dlopen` path, so it only works when the client's cwd is
+  `.../Contents/LoL`. Test harnesses must run from there.
+- If CEF's major version changes (client currently ships 108), Pengu shows a modal "does not support
+  your client version" dialog; update the headers in `core/cef` and rebuild.
+- Patching `libEGL.dylib` needs header padding: check `otool -h/-l` that the new load command ends
+  before `__text` (the script does).
+
+Testing without League: `client-plugin/dev/harness.html` fakes the client and the daemon; run Nebula with
+`NEBULA_DEV=1` (optionally with a temporary `HOME`) to exercise the HTTP API without the admin password.

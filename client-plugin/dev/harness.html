@@ -1,0 +1,64 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Nebula plugin harness</title>
+<style>
+  body { margin: 0; height: 100vh; background: #091428 radial-gradient(circle at 50% 30%, #1e2d4a, #010a13); color: #a09b8c; font: 13px system-ui; }
+  #log { position: fixed; top: 8px; left: 8px; white-space: pre; font: 11px ui-monospace, monospace; color: #7a8; }
+</style>
+<div id="log"></div>
+<script type="module">
+  // Fakes the League client page (champ select session + tile assets) and the Nebula daemon.
+  const calls = [];
+  const log = (m) => { calls.push(m); document.getElementById("log").textContent = calls.slice(-8).join("\n"); };
+  window.__NEBULA_TOKEN__ = "dev-token-0123456789abcdef";
+  window.__calls = calls;
+  window.DataStore = { set: (k, v) => log("DataStore " + k + " = " + v) };
+
+  const chromas = (base, colors) => colors.map((c, i) => ({ id: base + i + 100, num: base % 1000 + i + 100, name: "chroma " + (i + 1), available: i !== 1, colors: c }));
+  const skin = (id, name, available = true, cs = []) => ({ id, num: id % 1000, name, available, chromas: cs });
+  const ahri = {
+    champion: { key: 103, name: "Ahri" },
+    selected: 103003,
+    skins: [
+      skin(103001, "Dynasty Ahri", true, chromas(103001, [["#d4a017", "#7a0c0c"]])),
+      skin(103002, "Midnight Ahri"),
+      skin(103003, "Foxfire Ahri", true, chromas(103003, [["#2fa5ff", "#0a2a66"], ["#ff4fa3", "#601040"]])),
+      skin(103004, "Popstar Ahri", true, chromas(103004, [["#ffd1e8", "#ff2f8a"], ["#bfa", "#044"], ["#f90", "#420"]])),
+      skin(103005, "Challenger Ahri"),
+      skin(103006, "Academy Ahri"),
+      skin(103007, "Arcade Ahri", false),
+      skin(103014, "Spirit Blossom Ahri"),
+      skin(103015, "K/DA ALL OUT Ahri"),
+      skin(103016, "Elderwood Ahri"),
+    ],
+  };
+  let applyStep = 0;
+  const states = ["Importing", "BuildingOverlay", "WaitingForGame"];
+  const json = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+  const realFetch = window.fetch.bind(window);
+  window.fetch = async (url, init = {}) => {
+    url = String(url);
+    if (url.startsWith("/lol-champ-select/v1/session")) {
+      return window.__noChamp ? json({ errorCode: "RPC_ERROR", httpStatus: 404 }, 404)
+        : json({ localPlayerCellId: 1, myTeam: [{ cellId: 0, championId: 11 }, { cellId: 1, championId: 0, championPickIntent: 103 }] });
+    }
+    if (url.startsWith("http://127.0.0.1:47831")) {
+      const path = url.replace("http://127.0.0.1:47831", "");
+      const token = (init.headers || {})["X-Nebula-Token"];
+      log((init.method || "GET") + " " + path + " token=" + (token ? "yes" : "NO"));
+      if (token !== window.__NEBULA_TOKEN__) return json({ error: "unauthorized" }, 401);
+      if (path.startsWith("/skins")) return json(ahri);
+      if (path === "/apply") {
+        const id = JSON.parse(init.body).skin;
+        if (id === 103015) return json({ error: "Download failed: 404" }, 502);
+        ahri.selected = id; applyStep = 0; return json({ ok: true });
+      }
+      if (path === "/status") return json({ patcher: states[Math.min(applyStep++, states.length - 1)], applied: ahri.selected });
+    }
+    return realFetch(url, init);
+  };
+
+  const plugin = await import("../index.js");
+  plugin.init();
+  plugin.load();
+</script>

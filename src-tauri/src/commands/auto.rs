@@ -1,36 +1,20 @@
+use crate::commands::bridge;
 use crate::state::AppState;
-use serde::Serialize;
 use serde_json::Value;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Stdio};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tauri::{AppHandle, Emitter};
+use tauri::AppHandle;
 
-static ENABLED: AtomicBool = AtomicBool::new(false);
-
-#[derive(Serialize, Clone, PartialEq)]
-#[serde(rename_all = "camelCase")]
-struct ChampSelect {
-    connected: bool,
+#[derive(Clone, Copy, PartialEq, Debug)]
+struct Pick {
     in_champ_select: bool,
     champion_id: u32,
-    skin_num: u32,
 }
 
-const NOT_IN_SELECT: ChampSelect = ChampSelect {
-    connected: false,
-    in_champ_select: false,
-    champion_id: 0,
-    skin_num: 0,
-};
-
-#[tauri::command]
-pub fn set_auto_mode(enabled: bool) {
-    ENABLED.store(enabled, Ordering::Relaxed);
-}
+const NOT_IN_SELECT: Pick = Pick { in_champ_select: false, champion_id: 0 };
 
 /// The client writes its lockfile next to the Game folder: name:pid:port:password:protocol.
 fn read_lockfile(game_path: &str) -> Option<(u16, String)> {
@@ -85,47 +69,43 @@ fn lcu_get(port: u16, password: &str, path: &str) -> Option<Value> {
     serde_json::from_slice(&out.stdout).ok()
 }
 
-fn parse_session(session: &Value) -> ChampSelect {
+fn parse_session(session: &Value) -> Pick {
     let me = session["localPlayerCellId"].as_i64();
     let player = session["myTeam"]
         .as_array()
         .and_then(|team| team.iter().find(|p| me.is_some() && p["cellId"].as_i64() == me));
     match player {
-        Some(p) => ChampSelect {
-            connected: true,
+        Some(p) => Pick {
             in_champ_select: true,
             champion_id: p["championId"].as_u64().unwrap_or(0) as u32,
-            skin_num: (p["selectedSkinId"].as_u64().unwrap_or(0) % 1000) as u32,
         },
         None => NOT_IN_SELECT,
     }
 }
 
-/// Polls the League client while auto mode is on and emits `lcu-champ-select`
-/// whenever the local player's pick changes.
+/// Watches the League client and applies the remembered skin as soon as the
+/// local player locks a champion. Runs for the whole life of the app.
 pub fn spawn_watcher(app: AppHandle, state: Arc<Mutex<AppState>>) {
     std::thread::spawn(move || {
-        let mut last: Option<ChampSelect> = None;
+        let mut applied_for = 0;
         loop {
-            std::thread::sleep(Duration::from_millis(1500));
-            if !ENABLED.load(Ordering::Relaxed) {
-                last = None;
-                continue;
-            }
-
             let game_path = state.lock().ok().and_then(|s| s.game_path.clone());
-            let current = game_path
+            let session = game_path
                 .as_deref()
                 .and_then(read_lockfile)
                 .or_else(process_credentials)
-                .and_then(|(port, pw)| lcu_get(port, &pw, "/lol-champ-select/v1/session"))
-                .map(|v| ChampSelect { connected: true, ..parse_session(&v) })
-                .unwrap_or(NOT_IN_SELECT);
+                .and_then(|(port, pw)| lcu_get(port, &pw, "/lol-champ-select/v1/session"));
+            let connected = session.is_some();
+            let pick = session.as_ref().map(parse_session).unwrap_or(NOT_IN_SELECT);
 
-            if last.as_ref() != Some(&current) {
-                app.emit("lcu-champ-select", &current).ok();
-                last = Some(current);
+            if !pick.in_champ_select {
+                applied_for = 0;
+            } else if pick.champion_id != 0 && pick.champion_id != applied_for {
+                applied_for = pick.champion_id;
+                bridge::auto_apply(&app, &state, pick.champion_id);
             }
+
+            std::thread::sleep(Duration::from_millis(if connected { 1500 } else { 4000 }));
         }
     });
 }
@@ -140,20 +120,23 @@ mod tests {
         let session = json!({
             "localPlayerCellId": 2,
             "myTeam": [
-                {"cellId": 0, "championId": 11, "selectedSkinId": 11001},
-                {"cellId": 2, "championId": 266, "selectedSkinId": 266007}
+                {"cellId": 0, "championId": 11},
+                {"cellId": 2, "championId": 266}
             ]
         });
-        let cs = parse_session(&session);
-        assert!(cs.in_champ_select);
-        assert_eq!(cs.champion_id, 266);
-        assert_eq!(cs.skin_num, 7);
+        assert_eq!(parse_session(&session), Pick { in_champ_select: true, champion_id: 266 });
+    }
+
+    #[test]
+    fn unlocked_champion_is_zero() {
+        let session = json!({"localPlayerCellId": 0, "myTeam": [{"cellId": 0, "championId": 0}]});
+        assert_eq!(parse_session(&session), Pick { in_champ_select: true, champion_id: 0 });
     }
 
     #[test]
     fn error_body_is_not_champ_select() {
         let err = json!({"errorCode": "RPC_ERROR", "httpStatus": 404});
-        assert!(parse_session(&err) == NOT_IN_SELECT);
+        assert_eq!(parse_session(&err), NOT_IN_SELECT);
     }
 
     #[test]

@@ -35,8 +35,8 @@ fn resolve_game_path(raw: &str) -> Option<String> {
     None
 }
 
-#[tauri::command]
-pub fn detect_game_path(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Option<String>, String> {
+/// Looks for League in its default macOS location and records it in the app state.
+pub fn detect_default_path(state: &Arc<Mutex<AppState>>) -> Result<Option<String>, String> {
     if is_valid_game_dir(DEFAULT_GAME_PATH) {
         let path = Path::new(DEFAULT_GAME_PATH)
             .canonicalize()
@@ -53,6 +53,11 @@ pub fn detect_game_path(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Option
     let mut app_state = state.lock().map_err(|e| e.to_string())?;
     app_state.status = AppStatus::GameNotFound;
     Ok(None)
+}
+
+#[tauri::command]
+pub fn detect_game_path(state: State<'_, Arc<Mutex<AppState>>>) -> Result<Option<String>, String> {
+    detect_default_path(state.inner())
 }
 
 #[tauri::command]

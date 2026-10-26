@@ -3,7 +3,9 @@ mod state;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
-use tauri::Manager;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
+use tauri::{AppHandle, Manager, WindowEvent};
 
 extern "C" {
     fn geteuid() -> u32;
@@ -282,15 +284,50 @@ fn migrate_root_app_data(home: &str) {
     }
 }
 
+fn show_main_window(app: &AppHandle) {
+    if let Some(window) = app.get_webview_window("main") {
+        window.show().ok();
+        window.set_focus().ok();
+    }
+}
+
+/// Nebula lives in the menu bar: no Dock icon, no window until asked for.
+fn setup_background_mode(app: &mut tauri::App) -> tauri::Result<()> {
+    #[cfg(target_os = "macos")]
+    app.set_activation_policy(tauri::ActivationPolicy::Accessory);
+
+    let open = MenuItem::with_id(app, "open", "Open Nebula", true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", "Quit Nebula", true, None::<&str>)?;
+    let menu = Menu::with_items(app, &[&open, &quit])?;
+    let mut tray = TrayIconBuilder::new()
+        .menu(&menu)
+        .tooltip("Nebula")
+        .on_menu_event(|app, event| match event.id.as_ref() {
+            "open" => show_main_window(app),
+            "quit" => app.exit(0),
+            _ => {}
+        });
+    if let Some(icon) = app.default_window_icon() {
+        tray = tray.icon(icon.clone());
+    }
+    tray.build(app)?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // mod-tools needs root for task_for_pid on macOS.
-    if !running_as_root() {
+    // NEBULA_DEV=1 skips the elevation so the app can be exercised without a password;
+    // everything except the final task_for_pid patch step works that way.
+    if !running_as_root() && std::env::var_os("NEBULA_DEV").is_none() {
         relaunch_as_admin();
         return;
     }
 
-    eprintln!("[nebula] Running as root (euid=0)");
+    eprintln!(
+        "[nebula] Running as {}",
+        if running_as_root() { "root (euid=0)" } else { "a regular user (NEBULA_DEV)" }
+    );
 
     adopt_user_home();
 
@@ -302,8 +339,21 @@ pub fn run() {
             None,
         ))
         .manage(Arc::new(Mutex::new(AppState::default())))
+        .on_window_event(|window, event| {
+            // Closing the window hides it; the app keeps running in the menu bar.
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                window.hide().ok();
+            }
+        })
         .setup(|app| {
+            setup_background_mode(app)?;
             let state = app.state::<Arc<Mutex<AppState>>>().inner().clone();
+            // Without a game path there is nothing to patch, so ask for one.
+            if !matches!(commands::game_path::detect_default_path(&state), Ok(Some(_))) {
+                show_main_window(app.handle());
+            }
+            commands::bridge::spawn_server(app.handle().clone(), state.clone());
             commands::auto::spawn_watcher(app.handle().clone(), state);
             Ok(())
         })
@@ -329,7 +379,6 @@ pub fn run() {
             commands::customs::remove_custom,
             commands::customs::clear_all_customs,
             commands::customs::get_customs_dir_size,
-            commands::auto::set_auto_mode,
             commands::open_url,
         ])
         .run(tauri::generate_context!())

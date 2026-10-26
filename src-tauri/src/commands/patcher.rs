@@ -92,7 +92,7 @@ pub fn apply_skins(
 
 /// Validates inputs, sets status to Importing, spawns a background thread
 /// for the heavy work, and returns immediately so the UI stays responsive.
-fn start_apply(
+pub(crate) fn start_apply(
     app: AppHandle,
     zip_paths: Vec<String>,
     state: Arc<Mutex<AppState>>,

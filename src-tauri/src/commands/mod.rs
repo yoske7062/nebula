@@ -1,4 +1,5 @@
 pub mod auto;
+pub mod bridge;
 pub mod customs;
 pub mod game_path;
 pub mod patcher;

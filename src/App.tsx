@@ -1,12 +1,10 @@
 import { useState, useEffect, useCallback } from "react";
-import { getCurrentWebviewWindow } from "@tauri-apps/api/webviewWindow";
 import { getVersion } from "@tauri-apps/api/app";
 import { Swords, Layers, Package, Settings as SettingsIcon } from "lucide-react";
 import { useGamePath } from "./hooks/useGamePath";
 import { usePatcher } from "./hooks/usePatcher";
 import { useDownloads } from "./hooks/useDownloads";
 import { useCustoms } from "./hooks/useCustoms";
-import { useAutoMode } from "./hooks/useAutoMode";
 import { ensureChampions } from "./hooks/useChampions";
 import { ensureSkinIds, ensureRepoZips, ensureChromaInfo } from "./hooks/useSkinData";
 import { useVersionCheck } from "./hooks/useVersionCheck";
@@ -56,16 +54,6 @@ function App() {
       .catch(() => {});
   }, []);
 
-  // Show window once webview is ready
-  useEffect(() => {
-    const win = getCurrentWebviewWindow();
-    win.show();
-    win.setAlwaysOnTop(true).then(() => {
-      win.setFocus();
-      setTimeout(() => win.setAlwaysOnTop(false), 100);
-    });
-  }, []);
-
   // Preload caches
   useEffect(() => {
     ensureChampions().catch(() => {});
@@ -106,14 +94,6 @@ function App() {
   }, [skinSelection]);
 
   const skinCount = Object.keys(skinSelection).length;
-
-  const autoMode = useAutoMode({
-    downloads: dl.downloads,
-    skinSelection,
-    customPaths: customs.enabledPaths,
-    apply: patcher.apply,
-    notify: setToastMessage,
-  });
 
   function renderContent() {
     if (view === "settings") {
@@ -224,11 +204,6 @@ function App() {
           patcherStatus={patcher.status}
           skinCount={skinCount}
           customCount={customs.enabledCount}
-          auto={autoMode.auto}
-          random={autoMode.random}
-          connected={autoMode.connected}
-          onToggleAuto={autoMode.toggleAuto}
-          onToggleRandom={autoMode.toggleRandom}
           onApply={handleApply}
           onStop={patcher.stop}
         />
