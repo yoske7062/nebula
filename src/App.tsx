@@ -226,6 +226,7 @@ function App() {
           customCount={customs.enabledCount}
           auto={autoMode.auto}
           random={autoMode.random}
+          connected={autoMode.connected}
           onToggleAuto={autoMode.toggleAuto}
           onToggleRandom={autoMode.toggleRandom}
           onApply={handleApply}

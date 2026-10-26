@@ -8,6 +8,7 @@ const AUTO_KEY = "nebula_auto_mode";
 const RANDOM_KEY = "nebula_random_skin";
 
 interface ChampSelectEvent {
+  connected: boolean;
   inChampSelect: boolean;
   championId: number;
   skinNum: number;
@@ -32,6 +33,7 @@ function loadFlag(key: string): boolean {
 export function useAutoMode(opts: Options) {
   const [auto, setAuto] = useState(() => loadFlag(AUTO_KEY));
   const [random, setRandom] = useState(() => loadFlag(RANDOM_KEY));
+  const [connected, setConnected] = useState(false);
   const lastPick = useRef(0);
   const latest = useRef({ ...opts, random });
   latest.current = { ...opts, random };
@@ -46,10 +48,14 @@ export function useAutoMode(opts: Options) {
   }, [random]);
 
   useEffect(() => {
-    if (!auto) return;
+    if (!auto) {
+      setConnected(false);
+      return;
+    }
     lastPick.current = 0;
 
     const unlisten = listen<ChampSelectEvent>("lcu-champ-select", async ({ payload }) => {
+      setConnected(payload.connected);
       if (!payload.inChampSelect) {
         lastPick.current = 0;
         return;
@@ -81,6 +87,7 @@ export function useAutoMode(opts: Options) {
   return {
     auto,
     random,
+    connected,
     toggleAuto: () => setAuto((v) => !v),
     toggleRandom: () => setRandom((v) => !v),
   };

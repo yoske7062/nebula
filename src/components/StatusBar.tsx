@@ -7,6 +7,7 @@ interface StatusBarProps {
   customCount: number;
   auto: boolean;
   random: boolean;
+  connected: boolean;
   onToggleAuto: () => void;
   onToggleRandom: () => void;
   onApply: () => void;
@@ -56,6 +57,7 @@ export default function StatusBar({
   customCount,
   auto,
   random,
+  connected,
   onToggleAuto,
   onToggleRandom,
   onApply,
@@ -92,11 +94,22 @@ export default function StatusBar({
         <button
           onClick={onToggleAuto}
           aria-pressed={auto}
-          title="Apply the selected skin automatically when you lock in a champion"
+          title={
+            auto
+              ? connected
+                ? "Auto is on and connected to the League client"
+                : "Auto is on, waiting for the League client"
+              : "Apply the selected skin automatically when you lock in a champion"
+          }
           className={chipClass(auto)}
         >
           <Zap size={13} strokeWidth={2} />
           Auto
+          {auto && (
+            <span
+              className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-success" : "bg-ink-muted"}`}
+            />
+          )}
         </button>
         {auto && (
           <button

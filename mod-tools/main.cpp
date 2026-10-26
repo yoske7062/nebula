@@ -10,6 +10,7 @@
 #include <utility/zip.hpp>
 #include <wad/archive.hpp>
 #include <wad/index.hpp>
+#include <wad/repair.hpp>
 #include <chrono>
 #include <thread>
 #include <unistd.h>
@@ -120,11 +121,9 @@ static auto mod_copy(fs::path src, fs::path dst, fs::path game, bool noTFT) -> v
     }
 
     logi("Copying META files");
+    // Recursive: newer mods ship subfolders like META/hashes/, which copy_file rejects.
     fs::create_directories(dst / "META");
-    for (auto const& dirent : fs::directory_iterator(src / "META")) {
-        auto relpath = fs::relative(dirent.path(), src);
-        fs::copy_file(src / relpath, dst / relpath, fs::copy_options::overwrite_existing);
-    }
+    fs::copy(src / "META", dst / "META", fs::copy_options::recursive | fs::copy_options::overwrite_existing);
 
     logi("Writing wads");
     fs::create_directories(dst);
@@ -212,6 +211,10 @@ static auto mod_mkoverlay(fs::path src, fs::path dst, fs::path game, fs::names m
         if (mod_index.mounts.empty()) {
             logw("Empty mod: {}", mod_index.name);
             continue;
+        }
+
+        if (auto const repaired = wad::repair_outdated_bins(mod_index, game_index)) {
+            logi("Repaired {} outdated .bin file(s) in {}", repaired, mod_index.name);
         }
 
         // We have to resolve any conflicts inside mod itself

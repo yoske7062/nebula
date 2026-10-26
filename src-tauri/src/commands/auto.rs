@@ -14,12 +14,14 @@ static ENABLED: AtomicBool = AtomicBool::new(false);
 #[derive(Serialize, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 struct ChampSelect {
+    connected: bool,
     in_champ_select: bool,
     champion_id: u32,
     skin_num: u32,
 }
 
 const NOT_IN_SELECT: ChampSelect = ChampSelect {
+    connected: false,
     in_champ_select: false,
     champion_id: 0,
     skin_num: 0,
@@ -37,6 +39,28 @@ fn read_lockfile(game_path: &str) -> Option<(u16, String)> {
     let port = parts.next()?.parse().ok()?;
     let password = parts.next()?.to_string();
     Some((port, password))
+}
+
+fn parse_ux_args(line: &str) -> Option<(u16, String)> {
+    let (mut port, mut token) = (None, None);
+    for arg in line.split_whitespace() {
+        if let Some(v) = arg.strip_prefix("--app-port=") {
+            port = v.parse().ok();
+        } else if let Some(v) = arg.strip_prefix("--remoting-auth-token=") {
+            token = Some(v.to_string());
+        }
+    }
+    Some((port?, token?))
+}
+
+// ponytail: the lockfile is not always where we look on every client build, so
+// fall back to the UX process arguments, which always carry port and token.
+fn process_credentials() -> Option<(u16, String)> {
+    let out = Command::new("ps").args(["-ax", "-o", "command="]).output().ok()?;
+    String::from_utf8_lossy(&out.stdout)
+        .lines()
+        .filter(|l| l.contains("LeagueClientUx"))
+        .find_map(parse_ux_args)
 }
 
 // ponytail: shells out to curl instead of pulling in a TLS stack; swap for an
@@ -68,6 +92,7 @@ fn parse_session(session: &Value) -> ChampSelect {
         .and_then(|team| team.iter().find(|p| me.is_some() && p["cellId"].as_i64() == me));
     match player {
         Some(p) => ChampSelect {
+            connected: true,
             in_champ_select: true,
             champion_id: p["championId"].as_u64().unwrap_or(0) as u32,
             skin_num: (p["selectedSkinId"].as_u64().unwrap_or(0) % 1000) as u32,
@@ -92,8 +117,9 @@ pub fn spawn_watcher(app: AppHandle, state: Arc<Mutex<AppState>>) {
             let current = game_path
                 .as_deref()
                 .and_then(read_lockfile)
+                .or_else(process_credentials)
                 .and_then(|(port, pw)| lcu_get(port, &pw, "/lol-champ-select/v1/session"))
-                .map(|v| parse_session(&v))
+                .map(|v| ChampSelect { connected: true, ..parse_session(&v) })
                 .unwrap_or(NOT_IN_SELECT);
 
             if last.as_ref() != Some(&current) {
@@ -128,6 +154,13 @@ mod tests {
     fn error_body_is_not_champ_select() {
         let err = json!({"errorCode": "RPC_ERROR", "httpStatus": 404});
         assert!(parse_session(&err) == NOT_IN_SELECT);
+    }
+
+    #[test]
+    fn reads_ux_process_args() {
+        let line = "/Applications/League of Legends.app/Contents/LoL/League of Legends.app/Contents/MacOS/LeagueClientUx --riotclient-app-port=1111 --app-port=5678 --riotclient-auth-token=nope --remoting-auth-token=tok_en-1 --locale=en_US";
+        assert_eq!(parse_ux_args(line), Some((5678, "tok_en-1".to_string())));
+        assert_eq!(parse_ux_args("LeagueClientUx --locale=en_US"), None);
     }
 
     #[test]
