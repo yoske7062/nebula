@@ -6,6 +6,7 @@ import { useGamePath } from "./hooks/useGamePath";
 import { usePatcher } from "./hooks/usePatcher";
 import { useDownloads } from "./hooks/useDownloads";
 import { useCustoms } from "./hooks/useCustoms";
+import { useAutoMode } from "./hooks/useAutoMode";
 import { ensureChampions } from "./hooks/useChampions";
 import { ensureSkinIds, ensureRepoZips, ensureChromaInfo } from "./hooks/useSkinData";
 import { useVersionCheck } from "./hooks/useVersionCheck";
@@ -105,6 +106,14 @@ function App() {
   }, [skinSelection]);
 
   const skinCount = Object.keys(skinSelection).length;
+
+  const autoMode = useAutoMode({
+    downloads: dl.downloads,
+    skinSelection,
+    customPaths: customs.enabledPaths,
+    apply: patcher.apply,
+    notify: setToastMessage,
+  });
 
   function renderContent() {
     if (view === "settings") {
@@ -215,6 +224,10 @@ function App() {
           patcherStatus={patcher.status}
           skinCount={skinCount}
           customCount={customs.enabledCount}
+          auto={autoMode.auto}
+          random={autoMode.random}
+          onToggleAuto={autoMode.toggleAuto}
+          onToggleRandom={autoMode.toggleRandom}
           onApply={handleApply}
           onStop={patcher.stop}
         />

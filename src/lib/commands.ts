@@ -90,3 +90,7 @@ export async function clearAllCustoms(): Promise<void> {
 export async function getCustomsDirSize(): Promise<number> {
   return invoke("get_customs_dir_size");
 }
+
+export async function setAutoMode(enabled: boolean): Promise<void> {
+  return invoke("set_auto_mode", { enabled });
+}

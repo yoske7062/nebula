@@ -1,12 +1,25 @@
-import { Play, Square, Loader2 } from "lucide-react";
+import { Play, Square, Loader2, Zap, Shuffle } from "lucide-react";
 import type { PatcherStatus } from "../types";
 
 interface StatusBarProps {
   patcherStatus: PatcherStatus;
   skinCount: number;
   customCount: number;
+  auto: boolean;
+  random: boolean;
+  onToggleAuto: () => void;
+  onToggleRandom: () => void;
   onApply: () => void;
   onStop: () => void;
+}
+
+function chipClass(on: boolean): string {
+  return [
+    "flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2.5 text-xs transition-colors",
+    on
+      ? "bg-gold-400/10 text-gold-400 border-gold-400/30"
+      : "text-ink-muted border-border hover:text-ink",
+  ].join(" ");
 }
 
 function getStatusInfo(s: PatcherStatus): { label: string; dotClass: string; spinner: boolean } {
@@ -41,6 +54,10 @@ export default function StatusBar({
   patcherStatus,
   skinCount,
   customCount,
+  auto,
+  random,
+  onToggleAuto,
+  onToggleRandom,
   onApply,
   onStop,
 }: StatusBarProps) {
@@ -72,6 +89,26 @@ export default function StatusBar({
       </span>
 
       <div className="ml-auto flex shrink-0 items-center gap-3">
+        <button
+          onClick={onToggleAuto}
+          aria-pressed={auto}
+          title="Apply the selected skin automatically when you lock in a champion"
+          className={chipClass(auto)}
+        >
+          <Zap size={13} strokeWidth={2} />
+          Auto
+        </button>
+        {auto && (
+          <button
+            onClick={onToggleRandom}
+            aria-pressed={random}
+            title="Use a random downloaded skin for the champion instead of your selection"
+            className={chipClass(random)}
+          >
+            <Shuffle size={13} strokeWidth={2} />
+            Random
+          </button>
+        )}
         {!isActive && countLabel && (
           <span className="text-ink-muted text-xs tabular-nums select-none">{countLabel}</span>
         )}

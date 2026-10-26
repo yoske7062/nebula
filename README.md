@@ -72,4 +72,5 @@ This project is licensed under the MIT License.
 ## Credits
 
 - [cslol-manager](https://github.com/LeagueToolkit/cslol-manager) - modding tools
+- [Rose](https://github.com/Alban1911/Rose) - idea of detecting champion select through the client API
 - [LeagueSkins](https://github.com/Alban1911/LeagueSkins) - a comprehensive collection of League of Legends skin assets, organized by champion and skin IDs

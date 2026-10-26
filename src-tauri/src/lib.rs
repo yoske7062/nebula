@@ -3,6 +3,7 @@ mod state;
 
 use state::AppState;
 use std::sync::{Arc, Mutex};
+use tauri::Manager;
 
 extern "C" {
     fn geteuid() -> u32;
@@ -220,6 +221,11 @@ pub fn run() {
             None,
         ))
         .manage(Arc::new(Mutex::new(AppState::default())))
+        .setup(|app| {
+            let state = app.state::<Arc<Mutex<AppState>>>().inner().clone();
+            commands::auto::spawn_watcher(app.handle().clone(), state);
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::game_path::detect_game_path,
             commands::game_path::validate_game_path,
@@ -242,6 +248,7 @@ pub fn run() {
             commands::customs::remove_custom,
             commands::customs::clear_all_customs,
             commands::customs::get_customs_dir_size,
+            commands::auto::set_auto_mode,
             commands::open_url,
         ])
         .run(tauri::generate_context!())
