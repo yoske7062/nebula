@@ -23,3 +23,6 @@ mod-tools/target/
 .claude
 *.todo
 !scripts/*.sh
+
+# upstream cslol-tools checkout used to build mod-tools.exe on Windows
+cslol/
