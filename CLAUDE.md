@@ -8,8 +8,13 @@ them through `mod-tools` (from cslol-manager). Runs on macOS and Windows.
 - `src/` React UI. `src-tauri/src/commands/` Tauri commands (skins, patcher, game path, auto-apply, bridge).
 - `src-tauri/src/macos.rs` macOS-only startup (relaunch as root). Everything else is shared;
   platform differences are `#[cfg(windows)]` / `#[cfg(not(windows))]` next to the code they affect.
-- `mod-tools/` is the macOS patcher only. Windows uses upstream cslol-tools `mod-tools.exe`
-  plus its prebuilt `cslol-dll.dll` (same CLI: `import`, `mkoverlay`, `runoverlay`).
+- `mod-tools/` is the macOS patcher only. On Windows, upstream cslol-tools `mod-tools.exe`
+  (plus `cslol-dll.dll`, which it needs to start) only runs `import` and `mkoverlay`; cslol's
+  `runoverlay` no longer applies anything on current League builds.
+- Windows injection goes through LTK Manager's `ltk_patcher_host.exe` + `ltk_patcher_dll.dll`
+  (`src-tauri/src/commands/ltk.rs`), found in `%APPDATA%\dev.leaguetoolkit.manager\patcher\<digest>\`.
+  Nebula does not ship them: the user installs LTK Manager and opens it once so it downloads
+  the DLL. Patcher output goes to `%APPDATA%\com.nebula.app\patcher.log`.
 - `client-plugin/` + `scripts/pengu-install.sh`: in-client skin picker via Pengu Loader, macOS only so far.
 
 ## Windows dev setup

@@ -2,6 +2,7 @@ use crate::state::{AppState, PatcherStatus};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
+#[cfg(not(windows))]
 use std::process::Stdio;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tauri::{AppHandle, Manager, State};
@@ -14,6 +15,12 @@ fn apply_setup_lock() -> &'static Mutex<()> {
     static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     LOCK.get_or_init(|| Mutex::new(()))
 }
+
+/// Asks the running patcher to stop: runoverlay quits on a newline, the LTK host on "stop".
+#[cfg(not(windows))]
+const STOP_LINE: &[u8] = b"\n";
+#[cfg(windows)]
+const STOP_LINE: &[u8] = b"stop\n";
 
 fn work_dir(app: &AppHandle) -> PathBuf {
     let dir = app
@@ -201,7 +208,7 @@ pub(crate) fn start_apply(
         let old_pid = match state.lock() {
             Ok(mut s) => {
                 if let Some(mut pipe) = s.patcher_stdin.take() {
-                    pipe.write_all(b"\n").ok();
+                    pipe.write_all(STOP_LINE).ok();
                     drop(pipe);
                 }
                 s.patcher_pid.take()
@@ -292,6 +299,11 @@ fn do_apply_skins_bg(
         }
     })?;
 
+    if cfg!(windows) {
+        let restored = ltk::restore_wad_headers(&overlay_dir, std::path::Path::new(&game_path));
+        eprintln!("[nebula] Restored game headers on {} overlay WAD(s)", restored);
+    }
+
     // Step 3: Run patcher
     {
         if let Ok(mut s) = state.lock() {
@@ -301,23 +313,29 @@ fn do_apply_skins_bg(
         }
     }
 
-    let overlay_str = overlay_dir.to_string_lossy().to_string();
-    let config_str = config_file.to_string_lossy().to_string();
-    let game_arg = format!("--game:{}", game_path);
+    #[cfg(windows)]
+    let mut child = ltk::spawn_host(&base, &overlay_dir)?;
 
-    let mut child = command(&binary)
-        .args([
-            "runoverlay",
-            &overlay_str,
-            &config_str,
-            &game_arg,
-            "--opts:none",
-        ])
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
-        .map_err(|e| format!("Failed to start patcher: {}", e))?;
+    #[cfg(not(windows))]
+    let mut child = {
+        let overlay_str = overlay_dir.to_string_lossy().to_string();
+        let config_str = config_file.to_string_lossy().to_string();
+        let game_arg = format!("--game:{}", game_path);
+
+        command(&binary)
+            .args([
+                "runoverlay",
+                &overlay_str,
+                &config_str,
+                &game_arg,
+                "--opts:none",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|e| format!("Failed to start patcher: {}", e))?
+    };
 
     // Record pid/stdin unconditionally (even if a newer apply just superseded us
     // while we held the setup lock): a superseding apply must be able to find and
@@ -338,27 +356,26 @@ fn do_apply_skins_bg(
     let stdout = child.stdout.take();
     let stderr = child.stderr.take();
 
+    // The GUI app has no console on Windows, so keep the patcher's output where it can be read.
+    let log_path = base.join("patcher.log");
+    let _ = fs::write(&log_path, "");
+    let err_log_path = log_path.clone();
+
     let state_arc = state.clone();
     let stdout_thread = std::thread::spawn(move || {
         if let Some(out) = stdout {
             let reader = BufReader::new(out);
             for line in reader.lines().map_while(Result::ok) {
-                eprintln!("[nebula] mod-tools: {}", line);
-                if let Some(status_msg) = line.strip_prefix("Status: ") {
-                    let new_status = match status_msg {
-                        "Waiting for league match to start" => Some(PatcherStatus::WaitingForGame),
-                        "Found League" => Some(PatcherStatus::FoundGame),
-                        "Scanning" | "Wait initialized" | "Saving" | "Wait patchable" => Some(PatcherStatus::Scanning),
-                        "Patching" => Some(PatcherStatus::Patching),
-                        "Waiting for exit" => Some(PatcherStatus::InGame),
-                        "League exited" => Some(PatcherStatus::GameExited),
-                        _ => None,
-                    };
-                    if let Some(status) = new_status {
-                        if let Ok(mut s) = state_arc.lock() {
-                            if s.patcher_gen == gen {
-                                s.patcher_status = status;
-                            }
+                eprintln!("[nebula] patcher: {}", line);
+                append_log(&log_path, &line);
+                let new_status = if cfg!(windows) { ltk::status(&line) } else { runoverlay_status(&line) };
+                if let Some(status) = new_status {
+                    if let Ok(mut s) = state_arc.lock() {
+                        // A reported error stays up until a game is actually being served.
+                        let keep_error = matches!(s.patcher_status, PatcherStatus::Error(_))
+                            && !matches!(status, PatcherStatus::InGame | PatcherStatus::Error(_));
+                        if s.patcher_gen == gen && !keep_error {
+                            s.patcher_status = status;
                         }
                     }
                 }
@@ -370,7 +387,8 @@ fn do_apply_skins_bg(
         if let Some(err) = stderr {
             let reader = BufReader::new(err);
             for line in reader.lines().map_while(Result::ok) {
-                eprintln!("[nebula] mod-tools err: {}", line);
+                eprintln!("[nebula] patcher err: {}", line);
+                append_log(&err_log_path, &line);
             }
         }
     });
@@ -397,6 +415,25 @@ fn do_apply_skins_bg(
     }
 
     Ok(())
+}
+
+/// Maps a runoverlay "Status: ..." line (the macOS patcher) to the patcher status.
+fn runoverlay_status(line: &str) -> Option<PatcherStatus> {
+    match line.strip_prefix("Status: ")? {
+        "Waiting for league match to start" => Some(PatcherStatus::WaitingForGame),
+        "Found League" => Some(PatcherStatus::FoundGame),
+        "Scanning" | "Wait initialized" | "Saving" | "Wait patchable" => Some(PatcherStatus::Scanning),
+        "Patching" => Some(PatcherStatus::Patching),
+        "Waiting for exit" => Some(PatcherStatus::InGame),
+        "League exited" => Some(PatcherStatus::GameExited),
+        _ => None,
+    }
+}
+
+fn append_log(path: &std::path::Path, line: &str) {
+    if let Ok(mut file) = fs::OpenOptions::new().create(true).append(true).open(path) {
+        let _ = writeln!(file, "{}", line);
+    }
 }
 
 fn describe_exit(status: &std::process::ExitStatus) -> String {
@@ -426,8 +463,16 @@ pub fn stop_patcher(state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), String
     };
 
     if let Some(mut pipe) = stdin {
-        pipe.write_all(b"\n").ok();
+        pipe.write_all(STOP_LINE).ok();
         drop(pipe);
+    }
+
+    // The LTK host may outlive "stop"; make sure it cannot keep serving the old overlay.
+    #[cfg(windows)]
+    {
+        if let Some(pid) = state.lock().ok().and_then(|s| s.patcher_pid) {
+            std::thread::spawn(move || stop_process(pid));
+        }
     }
 
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -467,4 +512,4 @@ pub fn clear_work_dir(
     Ok(())
 }
 
-use super::{command, dir_size};
+use super::{command, dir_size, ltk};
