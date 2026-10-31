@@ -15,6 +15,8 @@ them through `mod-tools` (from cslol-manager). Runs on macOS and Windows.
   (`src-tauri/src/commands/ltk.rs`), found in `%APPDATA%\dev.leaguetoolkit.manager\patcher\<digest>\`.
   Nebula does not ship them: the user installs LTK Manager and opens it once so it downloads
   the DLL. Patcher output goes to `%APPDATA%\com.nebula.app\patcher.log`.
+- Windows runs Nebula as administrator (`src-tauri/windows-app-manifest.xml`): the LTK host
+  does not see the game otherwise. Rose does the same.
 - `client-plugin/` + `scripts/pengu-install.sh`: in-client skin picker via Pengu Loader, macOS only so far.
 
 ## Windows dev setup
