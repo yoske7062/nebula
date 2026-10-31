@@ -55,7 +55,7 @@ export default function GamePathSelector({
         } else {
           setValidatedPath(null);
           setPathValid(false);
-          setToastMsg("Invalid game path: LeagueofLegends.app not found");
+          setToastMsg("Invalid game path: League of Legends not found in that folder");
         }
       }
     } catch {
@@ -73,7 +73,7 @@ export default function GamePathSelector({
       const valid = await handler(validatedPath);
       if (!valid) {
         setPathValid(false);
-        setToastMsg("Invalid game path: LeagueofLegends.app not found");
+        setToastMsg("Invalid game path: League of Legends not found in that folder");
       }
     } catch {
       setToastMsg("Something went wrong while validating the path.");

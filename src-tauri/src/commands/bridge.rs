@@ -24,7 +24,12 @@ const TREE_URL: &str =
 const SKINS_JSON_URL: &str =
     "https://raw.communitydragon.org/latest/plugins/rcp-be-lol-game-data/global/default/v1/skins.json";
 /// Where the client-side plugin lives; the daemon drops its access token here.
+#[cfg(not(windows))]
 const PLUGIN_DIR: &str = "/Users/Shared/nebula/plugins/nebula";
+// ponytail: no Pengu installer on Windows yet, so nothing creates this folder and
+// the in-client picker stays off; the Nebula window covers picking skins.
+#[cfg(windows)]
+const PLUGIN_DIR: &str = r"C:\Users\Public\nebula\plugins\nebula";
 const CACHE_MAX_AGE_SECS: u64 = 12 * 3600;
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -320,9 +325,7 @@ pub fn auto_apply(app: &AppHandle, state: &Arc<Mutex<AppState>>, champion: u32) 
 
 fn random_token() -> String {
     let mut buf = [0u8; 16];
-    fs::File::open("/dev/urandom")
-        .and_then(|mut f| f.read_exact(&mut buf))
-        .expect("failed to read /dev/urandom");
+    getrandom::getrandom(&mut buf).expect("failed to get random bytes");
     buf.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -441,8 +444,11 @@ fn load_token() -> String {
     }
     let token = random_token();
     if file.parent().is_some_and(|d| d.is_dir()) && fs::write(&file, format!("export default \"{token}\";\n")).is_ok() {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(&file, fs::Permissions::from_mode(0o644)).ok();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&file, fs::Permissions::from_mode(0o644)).ok();
+        }
     }
     token
 }

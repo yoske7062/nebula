@@ -42,7 +42,7 @@ export function useCustoms() {
 
   const addCustom = useCallback(
     async (srcPath: string) => {
-      const fileName = srcPath.split("/").pop() ?? srcPath;
+      const fileName = srcPath.split(/[\\/]/).pop() ?? srcPath;
       const name = fileName.replace(/\.(zip|fantome)$/i, "");
       setError(null);
       const entry = await importCustom(srcPath, name);

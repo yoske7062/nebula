@@ -92,7 +92,7 @@ export default function Settings({
       if (selected) {
         const valid = await onPathChange(selected as string);
         if (!valid) {
-          setPathError("Invalid game path: LeagueofLegends.app not found");
+          setPathError("Invalid game path: League of Legends not found in that folder");
         }
       }
     } catch {

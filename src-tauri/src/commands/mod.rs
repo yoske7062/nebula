@@ -5,10 +5,33 @@ pub mod game_path;
 pub mod patcher;
 pub mod skins;
 
+use std::ffi::OsStr;
 use std::fs;
 use std::process::Command;
 
+/// Command::new that, on Windows, does not flash a console window for every
+/// helper process (mod-tools, curl) spawned from the GUI app.
+pub fn command(program: impl AsRef<OsStr>) -> Command {
+    #[allow(unused_mut)]
+    let mut cmd = Command::new(program);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
+#[cfg(windows)]
+#[tauri::command]
+pub fn open_url(url: String) -> Result<(), String> {
+    Command::new("explorer").arg(&url).spawn().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// Open a URL in the real (GUI) user's default browser, not root's.
+#[cfg(not(windows))]
 #[tauri::command]
 pub fn open_url(url: String) -> Result<(), String> {
     // stat -f '%Su' /dev/console gives the user who owns the GUI session.

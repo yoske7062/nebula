@@ -3,12 +3,25 @@ use std::path::Path;
 use std::sync::{Arc, Mutex};
 use tauri::State;
 
+#[cfg(not(windows))]
 const DEFAULT_GAME_PATH: &str = "/Applications/League of Legends.app/Contents/LoL/Game";
+#[cfg(windows)]
+const DEFAULT_GAME_PATH: &str = r"C:\Riot Games\League of Legends\Game";
 
-/// Check if a directory is a valid League game folder by looking for LeagueofLegends.app.
+#[cfg(not(windows))]
+const GAME_BINARY: &str = "LeagueofLegends.app";
+#[cfg(windows)]
+const GAME_BINARY: &str = "League of Legends.exe";
+
+/// Check if a directory is a valid League game folder by looking for the game binary.
 fn is_valid_game_dir(path: &str) -> bool {
-    let app_path = Path::new(path).join("LeagueofLegends.app");
-    app_path.exists()
+    Path::new(path).join(GAME_BINARY).exists()
+}
+
+/// canonicalize, minus the \\?\ prefix Windows adds, which would leak into the UI and mod-tools args.
+fn canonical(path: &str) -> Option<String> {
+    let full = Path::new(path).canonicalize().ok()?.to_string_lossy().to_string();
+    Some(full.strip_prefix(r"\\?\").map(String::from).unwrap_or(full))
 }
 
 /// Try multiple path suffixes to find the Game directory.
@@ -17,32 +30,28 @@ fn resolve_game_path(raw: &str) -> Option<String> {
         return None;
     }
 
-    let candidates = [
+    let mut candidates = vec![
         format!("{}/Contents/LoL/Game", raw),
         raw.to_string(),
         format!("{}/Game", raw),
     ];
-
-    for candidate in &candidates {
-        if is_valid_game_dir(candidate) {
-            return Path::new(candidate)
-                .canonicalize()
-                .ok()
-                .map(|p| p.to_string_lossy().to_string());
-        }
+    // The file dialog returns a file on Windows (LeagueClient.exe, League of Legends.exe), so try its folder too.
+    if let Some(dir) = Path::new(raw).parent().map(|p| p.to_string_lossy().to_string()) {
+        candidates.push(format!("{}/Game", dir));
+        candidates.push(dir);
     }
 
-    None
+    candidates
+        .iter()
+        .find(|c| is_valid_game_dir(c))
+        .and_then(|c| canonical(c))
 }
 
-/// Looks for League in its default macOS location and records it in the app state.
+/// Looks for League in its default location and records it in the app state.
 pub fn detect_default_path(state: &Arc<Mutex<AppState>>) -> Result<Option<String>, String> {
     if is_valid_game_dir(DEFAULT_GAME_PATH) {
-        let path = Path::new(DEFAULT_GAME_PATH)
-            .canonicalize()
-            .map_err(|e| e.to_string())?
-            .to_string_lossy()
-            .to_string();
+        let path = canonical(DEFAULT_GAME_PATH)
+            .ok_or_else(|| format!("Could not resolve {}", DEFAULT_GAME_PATH))?;
 
         let mut app_state = state.lock().map_err(|e| e.to_string())?;
         app_state.game_path = Some(path.clone());
@@ -68,7 +77,7 @@ pub fn validate_game_path(path: String) -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn set_game_path(path: String, state: State<'_, Arc<Mutex<AppState>>>) -> Result<(), String> {
     let validated = resolve_game_path(&path)
-        .ok_or_else(|| "Invalid game path: LeagueofLegends.app not found".to_string())?;
+        .ok_or_else(|| format!("Invalid game path: {} not found", GAME_BINARY))?;
 
     let mut app_state = state.lock().map_err(|e| e.to_string())?;
     app_state.game_path = Some(validated);

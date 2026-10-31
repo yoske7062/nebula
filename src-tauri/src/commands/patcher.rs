@@ -2,7 +2,7 @@ use crate::state::{AppState, PatcherStatus};
 use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock};
 use tauri::{AppHandle, Manager, State};
 
@@ -25,16 +25,19 @@ fn work_dir(app: &AppHandle) -> PathBuf {
 }
 
 fn sidecar_path(_app: &AppHandle) -> PathBuf {
-    let triple = if cfg!(target_arch = "aarch64") {
+    let triple = if cfg!(windows) {
+        "x86_64-pc-windows-msvc"
+    } else if cfg!(target_arch = "aarch64") {
         "aarch64-apple-darwin"
     } else {
         "x86_64-apple-darwin"
     };
+    let ext = std::env::consts::EXE_SUFFIX;
 
     // Production: Tauri bundles the sidecar as "mod-tools" next to the app binary
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
-            let bin = dir.join("mod-tools");
+            let bin = dir.join(format!("mod-tools{}", ext));
             if bin.exists() {
                 return bin;
             }
@@ -44,11 +47,66 @@ fn sidecar_path(_app: &AppHandle) -> PathBuf {
     // Dev: binary lives in src-tauri/binaries/ with the target triple suffix
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("binaries")
-        .join(format!("mod-tools-{}", triple))
+        .join(format!("mod-tools-{}{}", triple, ext))
+}
+
+/// Waits for an aborted patcher to exit on its own, then kills it.
+#[cfg(unix)]
+fn stop_process(pid: u32) {
+    let pid_i = pid as i32;
+    // kill(pid, 0) probes existence: 0 while alive, -1 (ESRCH) once gone.
+    let wait_gone = |timeout_ms: u64| -> bool {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
+        loop {
+            if unsafe { libc::kill(pid_i, 0) } != 0 {
+                return true;
+            }
+            if std::time::Instant::now() >= deadline {
+                return false;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+    };
+    if !wait_gone(3000) {
+        unsafe { libc::kill(pid_i, libc::SIGTERM) };
+        if !wait_gone(1500) {
+            unsafe { libc::kill(pid_i, libc::SIGKILL) };
+            wait_gone(2000);
+        }
+    }
+}
+
+/// Waits for an aborted patcher to exit on its own, then kills it.
+#[cfg(windows)]
+fn stop_process(pid: u32) {
+    use std::ffi::c_void;
+    const PROCESS_TERMINATE: u32 = 0x0001;
+    const SYNCHRONIZE: u32 = 0x0010_0000;
+    const WAIT_TIMEOUT: u32 = 0x0000_0102;
+
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn OpenProcess(access: u32, inherit: i32, pid: u32) -> *mut c_void;
+        fn WaitForSingleObject(handle: *mut c_void, ms: u32) -> u32;
+        fn TerminateProcess(handle: *mut c_void, code: u32) -> i32;
+        fn CloseHandle(handle: *mut c_void) -> i32;
+    }
+
+    unsafe {
+        let handle = OpenProcess(PROCESS_TERMINATE | SYNCHRONIZE, 0, pid);
+        if handle.is_null() {
+            return; // already gone
+        }
+        if WaitForSingleObject(handle, 3000) == WAIT_TIMEOUT {
+            TerminateProcess(handle, 1);
+            WaitForSingleObject(handle, 2000);
+        }
+        CloseHandle(handle);
+    }
 }
 
 fn run_mod_tools(binary: &PathBuf, args: &[String]) -> Result<String, String> {
-    let output = Command::new(binary)
+    let output = command(binary)
         .args(args)
         .output()
         .map_err(|e| format!("Failed to run mod-tools: {}", e))?;
@@ -151,28 +209,7 @@ pub(crate) fn start_apply(
             Err(_) => None,
         };
         if let Some(pid) = old_pid {
-            let pid_i = pid as i32;
-            // kill(pid, 0) probes existence: 0 while alive, -1 (ESRCH) once gone.
-            let wait_gone = |timeout_ms: u64| -> bool {
-                let deadline =
-                    std::time::Instant::now() + std::time::Duration::from_millis(timeout_ms);
-                loop {
-                    if unsafe { libc::kill(pid_i, 0) } != 0 {
-                        return true;
-                    }
-                    if std::time::Instant::now() >= deadline {
-                        return false;
-                    }
-                    std::thread::sleep(std::time::Duration::from_millis(20));
-                }
-            };
-            if !wait_gone(3000) {
-                unsafe { libc::kill(pid_i, libc::SIGTERM) };
-                if !wait_gone(1500) {
-                    unsafe { libc::kill(pid_i, libc::SIGKILL) };
-                    wait_gone(2000);
-                }
-            }
+            stop_process(pid);
         }
 
         if let Err(e) =
@@ -268,7 +305,7 @@ fn do_apply_skins_bg(
     let config_str = config_file.to_string_lossy().to_string();
     let game_arg = format!("--game:{}", game_path);
 
-    let mut child = Command::new(&binary)
+    let mut child = command(&binary)
         .args([
             "runoverlay",
             &overlay_str,
@@ -347,19 +384,7 @@ fn do_apply_skins_bg(
     if let Ok(mut s) = state.lock() {
         if s.patcher_gen == gen {
             if !exit_status.success() {
-                use std::os::unix::process::ExitStatusExt;
-                let detail = if let Some(code) = exit_status.code() {
-                    format!("exit code {}", code)
-                } else if let Some(sig) = exit_status.signal() {
-                    let name = match sig {
-                        1 => "SIGHUP", 2 => "SIGINT", 3 => "SIGQUIT", 6 => "SIGABRT",
-                        9 => "SIGKILL", 10 => "SIGBUS", 11 => "SIGSEGV", 13 => "SIGPIPE",
-                        15 => "SIGTERM", _ => "?",
-                    };
-                    format!("killed by signal {} ({})", sig, name)
-                } else {
-                    "unknown".to_string()
-                };
+                let detail = describe_exit(&exit_status);
                 eprintln!("[nebula] mod-tools runoverlay exited: {}", detail);
                 s.patcher_status =
                     PatcherStatus::Error(format!("Patcher exited unexpectedly ({})", detail));
@@ -372,6 +397,25 @@ fn do_apply_skins_bg(
     }
 
     Ok(())
+}
+
+fn describe_exit(status: &std::process::ExitStatus) -> String {
+    if let Some(code) = status.code() {
+        return format!("exit code {}", code);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::ExitStatusExt;
+        if let Some(sig) = status.signal() {
+            let name = match sig {
+                1 => "SIGHUP", 2 => "SIGINT", 3 => "SIGQUIT", 6 => "SIGABRT",
+                9 => "SIGKILL", 10 => "SIGBUS", 11 => "SIGSEGV", 13 => "SIGPIPE",
+                15 => "SIGTERM", _ => "?",
+            };
+            return format!("killed by signal {} ({})", sig, name);
+        }
+    }
+    "unknown".to_string()
 }
 
 #[tauri::command]
@@ -423,4 +467,4 @@ pub fn clear_work_dir(
     Ok(())
 }
 
-use super::dir_size;
+use super::{command, dir_size};

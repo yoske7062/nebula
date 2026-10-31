@@ -1,9 +1,9 @@
-use crate::commands::bridge;
+use crate::commands::{bridge, command};
 use crate::state::AppState;
 use serde_json::Value;
 use std::io::Write;
 use std::path::Path;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tauri::AppHandle;
@@ -25,6 +25,7 @@ fn read_lockfile(game_path: &str) -> Option<(u16, String)> {
     Some((port, password))
 }
 
+#[cfg_attr(windows, allow(dead_code))]
 fn parse_ux_args(line: &str) -> Option<(u16, String)> {
     let (mut port, mut token) = (None, None);
     for arg in line.split_whitespace() {
@@ -39,12 +40,21 @@ fn parse_ux_args(line: &str) -> Option<(u16, String)> {
 
 // ponytail: the lockfile is not always where we look on every client build, so
 // fall back to the UX process arguments, which always carry port and token.
+#[cfg(not(windows))]
 fn process_credentials() -> Option<(u16, String)> {
-    let out = Command::new("ps").args(["-ax", "-o", "command="]).output().ok()?;
+    let out = command("ps").args(["-ax", "-o", "command="]).output().ok()?;
     String::from_utf8_lossy(&out.stdout)
         .lines()
         .filter(|l| l.contains("LeagueClientUx"))
         .find_map(parse_ux_args)
+}
+
+// ponytail: Windows clients always write the lockfile next to Game, and polling
+// process command lines there means a PowerShell spawn every few seconds; add a
+// Get-CimInstance fallback only if lockfile misses show up.
+#[cfg(windows)]
+fn process_credentials() -> Option<(u16, String)> {
+    None
 }
 
 // ponytail: shells out to curl instead of pulling in a TLS stack; swap for an
@@ -52,7 +62,7 @@ fn process_credentials() -> Option<(u16, String)> {
 // (the client serves a self-signed cert) and the password goes via stdin so it
 // never shows up in `ps`.
 fn lcu_get(port: u16, password: &str, path: &str) -> Option<Value> {
-    let mut child = Command::new("curl")
+    let mut child = command("curl")
         .args(["-sk", "--max-time", "2", "-K", "-"])
         .arg(format!("https://127.0.0.1:{port}{path}"))
         .stdin(Stdio::piped())

@@ -25,7 +25,7 @@ export default function Customs({
 
   const handleAdd = useCallback(
     async (path: string) => {
-      const fileName = path.split("/").pop() ?? path;
+      const fileName = path.split(/[\\/]/).pop() ?? path;
       setAdding(fileName);
       setError(null);
       try {

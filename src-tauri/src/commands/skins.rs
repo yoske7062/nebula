@@ -21,15 +21,24 @@ struct DownloadProgress {
     skin_name: String,
 }
 
-/// Skin names like "K/DA Kai'Sa" contain '/', which is a path separator.
-/// Encode it for on-disk folder/file names and decode when reading back,
+/// Skin names like "K/DA Kai'Sa" contain '/', which is a path separator, and
+/// Windows also rejects \ : * ? " < > | ("PROJECT: Yi").
+/// Encode them for on-disk folder/file names and decode when reading back,
 /// so the logical skin name stays intact everywhere else.
+#[cfg(not(windows))]
+const RESERVED: &[(char, &str)] = &[('/', "%2F")];
+#[cfg(windows)]
+const RESERVED: &[(char, &str)] = &[
+    ('/', "%2F"), ('\\', "%5C"), (':', "%3A"), ('*', "%2A"), ('?', "%3F"),
+    ('"', "%22"), ('<', "%3C"), ('>', "%3E"), ('|', "%7C"),
+];
+
 fn encode_path(s: &str) -> String {
-    s.replace('/', "%2F")
+    RESERVED.iter().fold(s.to_string(), |s, (c, enc)| s.replace(*c, enc))
 }
 
 fn decode_path(s: &str) -> String {
-    s.replace("%2F", "/")
+    RESERVED.iter().fold(s.to_string(), |s, (c, enc)| s.replace(enc, &c.to_string()))
 }
 
 fn skins_dir(app: &AppHandle) -> PathBuf {
@@ -266,3 +275,17 @@ pub async fn clear_all_skins(app: AppHandle) -> Result<(), String> {
 }
 
 use super::dir_size;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reserved_chars_round_trip() {
+        for name in ["K/DA Kai'Sa", "PROJECT: Yi"] {
+            let enc = encode_path(name);
+            assert!(!enc.contains('/'));
+            assert_eq!(decode_path(&enc), name);
+        }
+    }
+}
