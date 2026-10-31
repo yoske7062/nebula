@@ -60,4 +60,4 @@ jobs:
           gh release create "v$VERSION-windows-${{ github.run_number }}" src-tauri/target/release/bundle/nsis/*.exe \
             --target "$GITHUB_SHA" \
             --title "Nebula v$VERSION (Windows)" \
-            --notes "Windows installer. Unsigned, so SmartScreen may warn: More info > Run anyway."
+            --notes "Windows installer. Needs LTK Manager installed and opened once (Nebula uses its patcher). Unsigned, so SmartScreen may warn: More info > Run anyway."

@@ -5,12 +5,12 @@
 <h1 align="center">Nebula</h1>
 
 <p align="center">
-  <a href="https://github.com/Mouadzz/nebula/releases/latest"><img src="https://img.shields.io/badge/download-latest-c89b3c?style=for-the-badge" alt="Download" /></a>
+  <a href="https://github.com/yoske7062/nebula/releases/latest"><img src="https://img.shields.io/badge/download-latest-c89b3c?style=for-the-badge" alt="Download" /></a>
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
-  <img src="https://img.shields.io/badge/platform-macOS-black" alt="Platform" />
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Windows-black" alt="Platform" />
   <img src="https://img.shields.io/badge/tauri-2-24C8D8" alt="Tauri" />
   <img src="https://img.shields.io/badge/react-19-61DAFB" alt="React" />
   <img src="https://img.shields.io/badge/version-0.1.12-c89b3c" alt="Version" />
@@ -35,9 +35,20 @@
 - Real-time patcher status (importing, waiting for game, skins active, etc.)
 - Game auto-detection - finds your League installation automatically
 - Storage management - clear downloaded skins and patcher data
-- macOS native - Apple Silicon and Intel
+- macOS (Apple Silicon and Intel) and Windows
 
 ## Installation
+
+### Windows
+
+1. Install [LTK Manager](https://github.com/LeagueToolkit/ltk-manager/releases/latest), open it once so it downloads its patcher, then close it. Nebula injects skins through LTK's patcher and does not ship it.
+2. Download `Nebula_x.x.x_x64-setup.exe` from the [Releases page](https://github.com/yoske7062/nebula/releases/latest) and run it.
+3. The installer is unsigned, so SmartScreen may say **"Windows protected your PC"**: click **More info**, then **Run anyway**.
+4. If League is not in `C:\Riot Games\League of Legends`, pick its folder (or `LeagueClient.exe`) when Nebula asks.
+
+If a skin does not show in game, the patcher's output is in `%APPDATA%\com.nebula.app\patcher.log`. When LTK reports its patcher is out of date, open LTK Manager so it updates.
+
+### macOS
 
 1. Download the latest `.dmg` for your Mac from the [Releases page](https://github.com/Mouadzz/nebula/releases/latest):
    - **Apple Silicon** (M1/M2/M3/M4/M5...) - `Nebula_x.x.x_aarch64.dmg`
@@ -72,5 +83,6 @@ This project is licensed under the MIT License.
 ## Credits
 
 - [cslol-manager](https://github.com/LeagueToolkit/cslol-manager) - modding tools
+- [LTK Manager](https://github.com/LeagueToolkit/ltk-manager) - the patcher used on Windows
 - [Rose](https://github.com/Alban1911/Rose) - idea of detecting champion select through the client API
 - [LeagueSkins](https://github.com/Alban1911/LeagueSkins) - a comprehensive collection of League of Legends skin assets, organized by champion and skin IDs
