@@ -5,6 +5,9 @@ on:
     branches: [windows-port]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-2022
@@ -47,8 +50,14 @@ jobs:
       - name: Build Tauri app
         run: npx tauri build
 
-      - name: Upload installer
-        uses: actions/upload-artifact@v4
-        with:
-          name: nebula-windows
-          path: src-tauri/target/release/bundle/nsis/*.exe
+      # Straight to a release: artifacts count against the account storage quota.
+      - name: Publish release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          gh release create "v$VERSION-windows-${{ github.run_number }}" src-tauri/target/release/bundle/nsis/*.exe \
+            --target "$GITHUB_SHA" \
+            --title "Nebula v$VERSION (Windows)" \
+            --notes "Windows installer. Unsigned, so SmartScreen may warn: More info > Run anyway."
